@@ -69,7 +69,7 @@ Libraries used: `streamlit`, `pandas`, `numpy`, `scipy`, `plotly`, `vnstock`, `y
 
 1. Clone the repository and navigate to the project directory:
    ```bash
-   git clone https://github.com/hoangthai35/marketentropy.git
+   git clone https://github.com/223hoangthai35/marketentropyv2.git
    cd marketentropy
    ```
 
