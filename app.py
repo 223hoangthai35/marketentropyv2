@@ -47,16 +47,11 @@ st.markdown("""
 # ==============================================================================
 
 @st.cache_data(ttl=3600)
-def fetch_market_data(ticker="VNINDEX", period="2y"):
+def fetch_market_data(ticker="VNINDEX", start_date="2020-01-01", end_date=None):
     """Lấy dữ liệu vĩ mô hoặc chỉ số (Vnstock)"""
     from vnstock import Vnstock
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    days = 365
-    if period == "2y":
-        days = 2 * 365
-    elif period == "3y":
-        days = 3 * 365
-    start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    if end_date is None:
+        end_date = datetime.now().strftime('%Y-%m-%d')
     stock = Vnstock().stock(symbol=ticker, source='VCI')
     df = stock.quote.history(start=start_date, end=end_date)
     df['time'] = pd.to_datetime(df['time'])
@@ -65,7 +60,7 @@ def fetch_market_data(ticker="VNINDEX", period="2y"):
     return df
 
 @st.cache_data(ttl=3600)
-def fetch_vn30_components():
+def fetch_vn30_components(start_date="2020-01-01", end_date=None):
     """Lấy dữ liệu 30 mã cổ phiếu lớn bằng YF để tính ma trận tương quan"""
     vn30_tickers = [
         "ACB.VN", "BCM.VN", "BID.VN", "BVH.VN", "CTG.VN", "FPT.VN", 
@@ -74,7 +69,9 @@ def fetch_vn30_components():
         "TCB.VN", "TPB.VN", "VCB.VN", "VHM.VN", "VIB.VN", "VIC.VN", 
         "VJC.VN", "VNM.VN", "VPB.VN", "VRE.VN"
     ]
-    df = yf.download(vn30_tickers, period="2y")['Close']
+    if end_date is None:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+    df = yf.download(vn30_tickers, start=start_date, end=end_date)['Close']
     return df.ffill().pct_change().dropna(how='all')
 
 def shannon_entropy(time_series, window=20, bins=10):
@@ -217,18 +214,92 @@ def main():
     st.markdown("<h1>SYSTEM ARCHITECT: STRUCTURAL ENTROPY & REGIME DETECTION</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color: #888;'>Khám phá sự đứt gãy cấu trúc (Structural Break) trong hành vi thị trường thông qua lăng kính Vật lý Hệ thống Phức tạp.</p>", unsafe_allow_html=True)
     
-    # Dữ liệu chính
-    with st.spinner('Building System Architectures... (Fetching Market Data)'):
-        vni_df = fetch_market_data(ticker="VNINDEX", period="3y")
-        vni_df = calculate_mse(vni_df)
-        vni_df = detect_market_regime(vni_df)
-        
-        vni_df['RSI'] = calculate_rsi(vni_df['Close'])
-        vni_df['MACD'], vni_df['MACD_Signal'] = calculate_macd(vni_df['Close'])
-        
-        vn30_returns = fetch_vn30_components()
-        sys_entropy = calculate_correlation_entropy(vn30_returns)
-        vni_df['System_Entropy'] = sys_entropy.reindex(vni_df.index).ffill()
+    # --- CẤU HÌNH SIDEBAR TRÍCH XUẤT DỮ LIỆU ---
+    st.sidebar.header("⚙️ Data Configuration")
+    data_source = st.sidebar.radio("Data Engine:", ["API Cloud (vnstock/yfinance)", "Upload Local File"])
+    
+    start_date = st.sidebar.date_input("Start Date", datetime(2020, 1, 1))
+    end_date = st.sidebar.date_input("End Date", datetime.now())
+    
+    vni_df = None
+    vn30_returns = None
+    
+    if data_source == "API Cloud (vnstock/yfinance)":
+        with st.spinner('Building System Architectures... (Fetching Market Data API)'):
+            try:
+                s_date = start_date.strftime('%Y-%m-%d')
+                e_date = end_date.strftime('%Y-%m-%d')
+                
+                vni_df = fetch_market_data(ticker="VNINDEX", start_date=s_date, end_date=e_date)
+                vn30_returns = fetch_vn30_components(start_date=s_date, end_date=e_date)
+            except Exception as e:
+                st.error("❌ Lỗi truy cập API. (Có thể do giới hạn IP/quá tải hoặc chặn từ Streamlit Cloud).")
+                st.info("💡 Vui lòng chuyển sang tính năng 'Upload Local File' trên thanh Sidebar để tiếp tục.")
+                return
+    else:
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 📂 Upload Your Data")
+        st.sidebar.markdown("""
+        **Yêu cầu Định dạng File CSV/Excel:**
+        Cần chứa các cột: `Date` (hoặc `time`, `ngày`), `Open`, `High`, `Low`, `Close`, `Volume`.
+        (Upload file lịch sử chỉ số VN-Index)
+        """)
+        uploaded_file = st.sidebar.file_uploader("Upload Data (.csv / .xlsx)", type=["csv", "xlsx"])
+        if uploaded_file is not None:
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    vni_df = pd.read_csv(uploaded_file)
+                else:
+                    vni_df = pd.read_excel(uploaded_file)
+                
+                date_cols = [c for c in vni_df.columns if str(c).lower().strip() in ['date', 'time', 'ngày']]
+                if len(date_cols) > 0:
+                    vni_df['Date_Index'] = pd.to_datetime(vni_df[date_cols[0]])
+                    vni_df.set_index('Date_Index', inplace=True)
+                    vni_df.sort_index(inplace=True)
+                else:
+                    st.error("❌ File không hợp lệ: Không tìm thấy cột Thời gian (Nên đặt tên là Date/Time/Ngày)")
+                    return
+                
+                col_mapping = {}
+                for c in vni_df.columns:
+                    c_low = str(c).lower().strip()
+                    if c_low == 'open': col_mapping[c] = 'Open'
+                    elif c_low == 'high': col_mapping[c] = 'High'
+                    elif c_low == 'low': col_mapping[c] = 'Low'
+                    elif c_low == 'close': col_mapping[c] = 'Close'
+                    elif c_low == 'volume': col_mapping[c] = 'Volume'
+                
+                vni_df.rename(columns=col_mapping, inplace=True)
+                
+                start_ts = pd.to_datetime(start_date)
+                end_ts = pd.to_datetime(end_date)
+                # Ensure the timezone matches or strip it if index has no timezone for simple comparison 
+                if vni_df.index.tzinfo is not None:
+                    start_ts = start_ts.tz_localize(vni_df.index.tzinfo)
+                    end_ts = end_ts.tz_localize(vni_df.index.tzinfo)
+
+                vni_df = vni_df.loc[start_ts:end_ts]
+            except Exception as e:
+                st.error(f"❌ Upload Error: {e}")
+                return
+        else:
+            st.info("⬅️ Vui lòng upload File dữ liệu ở Sidebar bên trái để ứng dụng xử lý thuật toán.")
+            return
+
+    if vni_df is not None and not vni_df.empty:
+        with st.spinner('Calculating Physics Engines...'):
+            vni_df = calculate_mse(vni_df)
+            vni_df = detect_market_regime(vni_df)
+            
+            vni_df['RSI'] = calculate_rsi(vni_df['Close'])
+            vni_df['MACD'], vni_df['MACD_Signal'] = calculate_macd(vni_df['Close'])
+            
+            if vn30_returns is not None:
+                sys_entropy = calculate_correlation_entropy(vn30_returns)
+                vni_df['System_Entropy'] = sys_entropy.reindex(vni_df.index).ffill()
+            else:
+                vni_df['System_Entropy'] = np.nan
         
     # --- TOP METRICS ---
     col1, col2, col3, col4 = st.columns(4)
@@ -247,7 +318,10 @@ def main():
     with col3:
         sys_ent_val = curr_data['System_Entropy']
         st.markdown(f"<div class='metric-label'>Cross-Sectional Entropy</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='metric-value'>{sys_ent_val:.1f} / 100</div>", unsafe_allow_html=True)
+        if pd.isna(sys_ent_val):
+            st.markdown(f"<div class='metric-value'>N/A</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='metric-value'>{sys_ent_val:.1f} / 100</div>", unsafe_allow_html=True)
 
     with col4:
         norm_ent = curr_data['Norm_Entropy']
@@ -273,19 +347,47 @@ def main():
         x=vni_df.index, y=vni_df['MA20'], line=dict(color='white', width=1, dash='dash'), name='MA20'
     ), row=1, col=1)
 
-    # Tô màu Regime phía sau
-    # Để tối ưu rendering, ta dùng fill_tozero hoặc các dải hcn
-    for regime, color in zip(['Stable Growth', 'Fragile Growth', 'Chaos/Panic', 'Bottoming'], 
-                             ['rgba(0, 255, 65, 0.3)', 'rgba(255, 215, 0, 0.3)', 'rgba(255, 0, 0, 0.3)', 'rgba(138, 43, 226, 0.3)']):
-        regime_mask = vni_df['Regime'] == regime
-        if regime_mask.any():
-            fig.add_trace(go.Scatter(
-                x=vni_df.index[regime_mask],
-                y=[vni_df['High'].max()] * len(vni_df[regime_mask]),
-                mode='markers',
-                marker=dict(symbol='square', size=8, color=color),
-                name=regime
-            ), row=1, col=1)
+    # Tô màu Regime phía sau (Cố định dải màu ở đỉnh đồ thị, không gây giãn trục Y)
+    regime_colors = {
+        'Stable Growth': 'rgba(0, 255, 65, 0.8)',
+        'Fragile Growth': 'rgba(255, 215, 0, 0.8)',
+        'Chaos/Panic': 'rgba(255, 0, 0, 0.8)',
+        'Bottoming': 'rgba(138, 43, 226, 0.8)'
+    }
+    
+    # Track the legend correctly
+    for regime, color in regime_colors.items():
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode='markers',
+            marker=dict(symbol='square', size=8, color=color),
+            name=regime
+        ), row=1, col=1)
+
+    # Sử dụng Rectangle Shapes để cố định dải màu dọc trục ngang, và cố định trên đỉnh trục dọc (0.97 -> 1.0 = 3% không gian trên cùng)
+    vni_df['Regime_Shift'] = vni_df['Regime'] != vni_df['Regime'].shift(1)
+    shift_indices = vni_df.index[vni_df['Regime_Shift']].tolist()
+    if len(shift_indices) > 0 and shift_indices[0] != vni_df.index[0]:
+        shift_indices.insert(0, vni_df.index[0])
+    if len(shift_indices) == 0:
+        shift_indices = [vni_df.index[0]]
+    shift_indices.append(vni_df.index[-1])
+
+    for i in range(len(shift_indices) - 1):
+        start_idx = shift_indices[i]
+        end_idx = shift_indices[i+1]
+        regime = vni_df.loc[start_idx, 'Regime']
+        color = regime_colors.get(regime)
+        if color:
+            fig.add_shape(
+                type="rect",
+                x0=start_idx, x1=end_idx,
+                y0=0.97, y1=1.0,
+                yref="y domain",
+                fillcolor=color,
+                line_width=0,
+                layer="above", 
+                row=1, col=1
+            )
 
     # Entropy Line
     fig.add_trace(go.Scatter(
@@ -298,11 +400,13 @@ def main():
         template="plotly_dark", height=700, margin=dict(l=20, r=20, t=20, b=20),
         plot_bgcolor='#0E1117', paper_bgcolor='#000000',
         xaxis_rangeslider_visible=False,
+        dragmode='pan',
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    fig.update_yaxes(title_text="Price", row=1, col=1)
-    fig.update_yaxes(title_text="Entropy (0-100)", row=2, col=1)
-    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
+    fig.update_xaxes(fixedrange=False)
+    fig.update_yaxes(title_text="Price", row=1, col=1, fixedrange=False, side="right")
+    fig.update_yaxes(title_text="Entropy (0-100)", row=2, col=1, fixedrange=False, side="right")
+    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
     
     # Ý nghĩa Regimes
     st.info("""
@@ -325,19 +429,24 @@ def main():
         fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['Entropy_Daily'], name='Daily Entropy (Ngắn hạn)', line=dict(color='rgba(255, 255, 255, 0.4)')))
         fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['Entropy_Weekly'], name='Weekly Entropy (Trung hạn)', line=dict(color='rgba(0, 255, 65, 0.8)', width=2)))
         fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['Entropy_Monthly'], name='Monthly Entropy (Dài hạn)', line=dict(color='rgba(255, 0, 255, 0.8)', width=3)))
-        fig2.update_layout(template="plotly_dark", plot_bgcolor='#000000', paper_bgcolor='#000000', margin=dict(l=0, r=0, t=30, b=0), height=350)
-        st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': True})
+        fig2.update_layout(dragmode='pan', template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#000000', margin=dict(l=0, r=0, t=30, b=0), height=350)
+        fig2.update_yaxes(fixedrange=False, side="right")
+        st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
         st.caption("Logic: Entropy Daily cao nhưng Weekly/Monthly thấp -> Biến động chỉ là NHIỄU NGẮN HẠN, xu hướng vĩ mô dài hạn vẫn bền vững. Người dùng không nên hoảng loạn.")
 
     with colB:
         st.markdown("**Cross-Sectional Entropy (Eigenvalue Decomposition VN30)**")
-        fig3 = go.Figure()
-        fig3.add_trace(go.Scatter(x=vni_df.index, y=vni_df['System_Entropy'], fill='tozeroy', name='System Entropy', line=dict(color='#00BFFF')))
-        fig3.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Chaos Threshold (Đỉnh Phân Hóa)")
-        fig3.add_hline(y=40, line_dash="dash", line_color="#00FF41", annotation_text="High Consensus (Trend Mạnh)")
-        fig3.update_layout(template="plotly_dark", plot_bgcolor='#000000', paper_bgcolor='#000000', margin=dict(l=0, r=0, t=30, b=0), height=350)
-        st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': True})
-        st.caption("Đo lường sự phân mảnh (Fractal) dòng tiền vào 30 mã vốn hóa cao nhất.")
+        if vni_df['System_Entropy'].isna().all():
+            st.info("⚠️ Không có dữ liệu rổ VN30 (Đang dùng Upload Data). Biểu đồ Correlation bị ẩn.")
+        else:
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(x=vni_df.index, y=vni_df['System_Entropy'], fill='tozeroy', name='System Entropy', line=dict(color='#00BFFF')))
+            fig3.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Chaos Threshold (Đỉnh Phân Hóa)")
+            fig3.add_hline(y=40, line_dash="dash", line_color="#00FF41", annotation_text="High Consensus (Trend Mạnh)")
+            fig3.update_layout(dragmode='pan', template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#000000', margin=dict(l=0, r=0, t=30, b=0), height=350)
+            fig3.update_yaxes(fixedrange=False, side="right")
+            st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
+            st.caption("Đo lường sự phân mảnh (Fractal) dòng tiền vào 30 mã vốn hóa cao nhất.")
 
     st.markdown("---")
     
@@ -360,12 +469,12 @@ def main():
     fig_comp.add_trace(go.Scatter(x=vni_df.index, y=vni_df['Norm_Entropy'], name='Structural Entropy', line=dict(color='#00FF41')), row=3, col=1)
     fig_comp.add_hline(y=65, row=3, col=1, line_dash="dash", line_color="red", annotation_text="Tín hiệu sớm đứt gãy")
     
-    fig_comp.update_layout(template="plotly_dark", plot_bgcolor='#000000', paper_bgcolor='#000000', height=600, margin=dict(l=20, r=20, t=20, b=20))
-    fig_comp.update_yaxes(title_text="RSI", row=1, col=1)
-    fig_comp.update_yaxes(title_text="MACD", row=2, col=1)
-    fig_comp.update_yaxes(title_text="Entropy", row=3, col=1)
+    fig_comp.update_layout(dragmode='pan', template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#000000', height=600, margin=dict(l=20, r=20, t=20, b=20))
+    fig_comp.update_yaxes(title_text="RSI", row=1, col=1, fixedrange=False, side="right")
+    fig_comp.update_yaxes(title_text="MACD", row=2, col=1, fixedrange=False, side="right")
+    fig_comp.update_yaxes(title_text="Entropy", row=3, col=1, fixedrange=False, side="right")
     
-    st.plotly_chart(fig_comp, use_container_width=True, config={'scrollZoom': True})
+    st.plotly_chart(fig_comp, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
     
     st.markdown("""
     > **Sự tinh hoa của Entropy Filter (Khử nhiễu cho RSI):** 
