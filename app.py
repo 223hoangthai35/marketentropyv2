@@ -552,14 +552,37 @@ def main():
         st.plotly_chart(fig_ce, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
         
     with col_mfi:
-        st.markdown("**Cơ cấu Fragility Index**")
+        st.markdown("**Cơ cấu Fragility Index & Chẩn đoán CECP**")
         curr_mfi = last_n['MFI_Price'].iloc[-1]
         prev_mfi = last_n['MFI_Price'].iloc[-2]
-        st.metric("MFI (Price)", f"{curr_mfi:.4f}", delta=f"{curr_mfi - prev_mfi:.4f}", delta_color="inverse")
-        
+        curr_h = last_n['WPE_Price_Daily'].iloc[-1]
+        prev_h = last_n['WPE_Price_Daily'].iloc[-2]
         curr_c = last_n['Complexity_Price'].iloc[-1]
+        
+        st.metric("MFI (Price)", f"{curr_mfi:.4f}", delta=f"{curr_mfi - prev_mfi:.4f}", delta_color="inverse")
         st.metric("Statistical Complexity", f"{curr_c:.4f}", delta=f"{curr_c - last_n['Complexity_Price'].iloc[-2]:.4f}")
-        st.info("💡 **MFI = WPE × (1 - C)**\n\nKhi WPE rơi vào vùng cực đại nhưng Complexity thấp, hệ thống mất liên kết, MFI tăng thể hiện bong bóng hoặc sụp đổ (dòng tiền chi phối cực kì manh mún).")
+        
+        st.markdown("---")
+        
+        # State Logic 
+        if curr_h >= 0.9 and curr_c <= 0.05:
+            state_name = "🔴 Chaos/Crash (Hỗn loạn/Sụp đổ)"
+            state_prompt = "Thị trường đang ghi nhận mức Entropy biến động giá đạt cực đại ($H \\approx 1.0$) và Complexity biến mất ($C \\approx 0$). Điểm Present Market nằm ở góc dưới cùng bên phải của đồ thị CECP. Hãy mô tả trạng thái hỗn loạn này dưới góc nhìn của sự hoảng loạn bầy đàn (Herding Behavior). Nhà đầu tư nên làm gì khi hệ thống hoàn toàn mất đi tính tự tổ chức?"
+        elif curr_h > 0.8 and curr_c < 0.1:
+            state_name = "🟡 Fragile Growth (Tăng trưởng dễ vỡ)"
+            state_prompt = "Dựa trên dữ liệu VN-Index, chỉ số MFI đang ở mức cao (>0.8) với Complexity ($C$) cực thấp và Entropy ($H$) tiệm cận vùng Chaos. Điểm trên đồ thị CECP đang bám sát đường Lower Bound. Hãy phân tích trạng thái này dưới góc độ dòng tiền nóng và rủi ro sụp đổ cấu trúc. Tại sao mức tăng điểm hiện tại lại được coi là thiếu bền vững và dễ vỡ trước các cú sốc thông tin?"
+        elif 0.6 <= curr_h <= 0.75 and curr_h < prev_h and curr_c <= 0.15:
+            state_name = "👽 Dead Cat Bounce (Hồi phục thiếu NL)"
+            state_prompt = "VN-Index vừa trải qua nhịp giảm mạnh và đang có dấu hiệu hồi phục kỹ thuật. Chỉ số Entropy ($H$) đang giảm dần nhưng Complexity ($C$) không có sự bứt phá đáng kể, điểm vẫn nằm ở vùng biên dưới của mặt phẳng CECP. Với giả định khối lượng giao dịch (Volume) đang suy yếu như một 'quả bóng tennis mất năng lượng', hãy đưa ra nhận định về khả năng đây chỉ là một bẫy hồi phục ngắn hạn thay vì một sự khởi đầu của xu hướng Structural Growth."
+        elif 0.4 <= curr_h <= 0.6 and curr_c > 0.15:
+            state_name = "🟢 Structural Growth (Bền vững)"
+            state_prompt = "Chỉ số MFI của VN-Index đang giảm về vùng an toàn (<0.5) nhờ sự gia tăng đáng kể của Statistical Complexity ($C$). Điểm trên đồ thị CECP đã rời xa Lower Bound và di chuyển về vùng trung tâm của các hệ thống phức tạp. Hãy giải thích tại sao trạng thái này cho thấy thị trường đang có sự đồng thuận về cấu trúc, dòng tiền thông minh bắt đầu dẫn dắt và các quy luật kỹ thuật có độ tin cậy cao hơn."
+        else:
+            state_name = "⚪ Transitioning (Chuyển pha)"
+            state_prompt = "Thị trường đang nằm ở vùng đệm của mặt phẳng CECP, Entropy và Complexity đang giằng co để xác lập cấu trúc dòng tiền mới. Cần quan sát thêm quỹ đạo (Trajectory) để xác định rõ xu hướng."
+            
+        st.markdown(f"**Current CECP State:**<br> <span style='color: white; font-size: 1.1rem'>{state_name}</span>", unsafe_allow_html=True)
+        st.info(f"💡 **AI Prompt Context:**\n\n_{state_prompt}_")
         
     st.markdown("---")
     

@@ -52,6 +52,25 @@ $$ MFI = WPE \times (1 - C) $$
   - 🟥 **Chaos / Panic**: Mathematical execution of the price breakdown.
   - 🟪 **Bottoming**: Prices are depressed, but MFI successfully "Damps / Cools off." Formally reorganizing.
 
+### 5. 🔮 CECP Diagnostics & Market Navigation
+The position of the VN-Index on the Complexity-Entropy Causality Plane determines four critical states. In the dashboard, AI-driven prompts are dynamically generated based on the trajectory:
+
+1. 🟡 **Fragile Growth (Tăng trưởng dễ vỡ)**
+   - **Signature**: $H > 0.8$, $C < 0.1$, drifting near the Lower Bound.
+   - **AI Prompt Context**: "Dựa trên dữ liệu VN-Index, chỉ số MFI đang ở mức cao (>0.8) với Complexity ($C$) cực thấp và Entropy ($H$) tiệm cận vùng Chaos. Điểm trên đồ thị CECP đang bám sát đường Lower Bound. Hãy phân tích trạng thái này dưới góc độ dòng tiền nóng và rủi ro sụp đổ cấu trúc. Tại sao mức tăng điểm hiện tại lại được coi là thiếu bền vững và dễ vỡ trước các cú sốc thông tin?"
+
+2. 👽 **Dead Cat Bounce (Hồi phục thiếu năng lượng)**
+   - **Signature**: $H$ decreasing towards $0.6 - 0.75$, $C$ stagnant or mildly rising, low Volume.
+   - **AI Prompt Context**: "VN-Index vừa trải qua nhịp giảm mạnh và đang có dấu hiệu hồi phục kỹ thuật. Chỉ số Entropy ($H$) đang giảm dần nhưng Complexity ($C$) không có sự bứt phá đáng kể, điểm vẫn nằm ở vùng biên dưới của mặt phẳng CECP. Với giả định khối lượng giao dịch (Volume) đang suy yếu như một 'quả bóng tennis mất năng lượng', hãy đưa ra nhận định về khả năng đây chỉ là một bẫy hồi phục ngắn hạn thay vì một sự khởi đầu của xu hướng Structural Growth."
+
+3. 🟢 **Structural Growth (Tăng trưởng bền vững)**
+   - **Signature**: $H$ stable around $0.4 - 0.6$, $C$ securely elevated ($>0.2$), positioned centrally.
+   - **AI Prompt Context**: "Chỉ số MFI của VN-Index đang giảm về vùng an toàn (<0.5) nhờ sự gia tăng đáng kể của Statistical Complexity ($C$). Điểm trên đồ thị CECP đã rời xa Lower Bound và di chuyển về vùng trung tâm của các hệ thống phức tạp. Hãy giải thích tại sao trạng thái này cho thấy thị trường đang có sự đồng thuận về cấu trúc, dòng tiền thông minh bắt đầu dẫn dắt và các quy luật kỹ thuật có độ tin cậy cao hơn."
+
+4. 🔴 **Chaos/Crash (Hỗn loạn/Sụp đổ)**
+   - **Signature**: $H \to 1.0$, $C \to 0$, MFI reaches maximum saturation.
+   - **AI Prompt Context**: "Thị trường đang ghi nhận mức Entropy biến động giá đạt cực đại ($H \approx 1.0$) và Complexity biến mất ($C \approx 0$). Điểm Present Market nằm ở góc dưới cùng bên phải của đồ thị CECP. Hãy mô tả trạng thái hỗn loạn này dưới góc nhìn của sự hoảng loạn bầy đàn (Herding Behavior). Nhà đầu tư nên làm gì khi hệ thống hoàn toàn mất đi tính tự tổ chức?"
+
 ---
 
 ## 🚀 Features & Usability
