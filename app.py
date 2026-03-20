@@ -8,13 +8,15 @@ import warnings
 from datetime import datetime, timedelta
 import yfinance as yf
 
-# Ignore warnings
 warnings.filterwarnings('ignore')
 
 # --------------------------------------------------------------------------------
 # CẤU HÌNH GIAO DIỆN VIBE CODING (BLOOMBERG TERMINAL THEME)
 # --------------------------------------------------------------------------------
 st.set_page_config(layout="wide", page_title="Market Entropy Terminal", page_icon="📈")
+
+def _t(vi, en):
+    return en if st.session_state.get('lang', 'Tiếng Việt') == 'English' else vi
 
 st.markdown("""
 <style>
@@ -112,7 +114,6 @@ def compute_wpe_complexity(x, m=3, tau=1):
     return H_P, C_JS
 
 def calculate_advanced_entropy(df, m=3, tau=1, window=22):
-    # Dùng log returns
     np.seterr(divide='ignore', invalid='ignore')
     log_ret = np.log(df['Close'] / df['Close'].shift(1)).values
     vol_ret = np.log(df['Volume'] / df['Volume'].shift(1)).values
@@ -248,7 +249,7 @@ def detect_market_regime(df):
     for i in range(len(df)):
         c = df['Close'].iloc[i]
         ma = df['MA20'].iloc[i]
-        ent = df['MFI_Price'].iloc[i] * 100  # Sử dụng MFI làm Base Trigger
+        ent = df['MFI_Price'].iloc[i] * 100
         ent_d = df['Entropy_Diff'].iloc[i]
         
         if pd.isna(ent) or pd.isna(ma):
@@ -264,7 +265,7 @@ def detect_market_regime(df):
             df.iloc[i, df.columns.get_loc('Regime')] = 'Chaos/Panic'
             df.iloc[i, df.columns.get_loc('Color')] = 'rgba(255, 0, 0, 0.8)'
         elif c < ma and ent_d < 0:
-            df.iloc[i, df.columns.get_loc('Regime')] = 'Bottoming'
+            df.iloc[i, df.columns.get_loc('Regime')] = 'Structural Recomposition'
             df.iloc[i, df.columns.get_loc('Color')] = 'rgba(138, 43, 226, 0.8)'
 
     return df
@@ -289,39 +290,41 @@ def calculate_macd(data, slow=26, fast=12, signal_len=9):
 # GIAO DIỆN (STREAMLIT DASHBOARD)
 # ==============================================================================
 def main():
-    st.markdown("<h1>SYSTEM ARCHITECT: STRUCTURAL ENTROPY & REGIME DETECTION</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #888;'>Khám phá sự đứt gãy cấu trúc (Structural Break) trong hành vi thị trường thông qua lăng kính Vật lý Hệ thống Phức tạp.</p>", unsafe_allow_html=True)
+    st.sidebar.markdown("### 🌐 " + _t("Ngôn ngữ", "Language"))
+    st.session_state['lang'] = st.sidebar.radio("", ["Tiếng Việt", "English"], horizontal=True, label_visibility="collapsed")
     
-    # --- CẤU HÌNH SIDEBAR TRÍCH XUẤT DỮ LIỆU ---
-    st.sidebar.header("⚙️ Data Configuration")
-    data_source = st.sidebar.radio("Data Engine:", ["API Cloud (vnstock/yfinance)", "Upload Local File"])
+    st.markdown("<h1>" + _t("SYSTEM ARCHITECT: ĐỨT GÃY CẤU TRÚC", "SYSTEM ARCHITECT: STRUCTURAL ENTROPY & REGIME DETECTION") + "</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #888;'>" + _t("Khám phá sự đứt gãy cấu trúc trong hành vi thị trường thông qua lăng kính Vật lý Hệ thống Phức tạp.", "Discovering Structural Breaks in market behavior through the lens of Complex Systems Physics.") + "</p>", unsafe_allow_html=True)
     
-    start_date = st.sidebar.date_input("Start Date", datetime(2020, 1, 1))
-    end_date = st.sidebar.date_input("End Date", datetime.now())
+    st.sidebar.header(_t("⚙️ Cấu hình Dữ liệu", "⚙️ Data Configuration"))
+    data_source = st.sidebar.radio(_t("Nguồn Dữ liệu:", "Data Engine:"), [_t("API Đám mây (vnstock/yfinance)", "API Cloud (vnstock/yfinance)"), _t("Tải lên Local File", "Upload Local File")])
+    
+    start_date = st.sidebar.date_input(_t("Ngày Bắt đầu", "Start Date"), datetime(2020, 1, 1))
+    end_date = st.sidebar.date_input(_t("Ngày Kết thúc", "End Date"), datetime.now())
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧮 Physics Parameters")
-    embed_dim = st.sidebar.slider("Embedded Dimension (m)", 3, 7, 3)
-    rolling_window = st.sidebar.slider("Rolling Window (days)", 20, 252, 22)
+    st.sidebar.markdown("### 🧮 " + _t("Tham số Vật lý", "Physics Parameters"))
+    embed_dim = st.sidebar.slider(_t("Kích thước Nhúng (m)", "Embedded Dimension (m)"), 3, 7, 3)
+    rolling_window = st.sidebar.slider(_t("Cửa sổ Dữ liệu (days)", "Rolling Window (days)"), 20, 252, 22)
 
     vni_df = None
     vn30_returns = None
     
-    if data_source == "API Cloud (vnstock/yfinance)":
-        with st.spinner('Building System Architectures... (Fetching Market Data API)'):
+    if data_source == _t("API Đám mây (vnstock/yfinance)", "API Cloud (vnstock/yfinance)"):
+        with st.spinner(_t('Đang xây dựng Kiến trúc... (Lấy Dữ liệu API)', 'Building System Architectures... (Fetching Market Data API)')):
             try:
                 s_date = start_date.strftime('%Y-%m-%d')
                 e_date = end_date.strftime('%Y-%m-%d')
                 vni_df = fetch_market_data(ticker="VNINDEX", start_date=s_date, end_date=e_date)
                 vn30_returns = fetch_vn30_components(start_date=s_date, end_date=e_date)
             except Exception as e:
-                st.error("❌ Lỗi truy cập API. (Có thể do giới hạn IP/quá tải hoặc chặn từ Streamlit Cloud).")
-                st.info("💡 Vui lòng chuyển sang tính năng 'Upload Local File' trên thanh Sidebar để tiếp tục.")
+                st.error(_t("❌ Lỗi truy cập API. (Có thể do giới hạn IP/chặn Cloud).", "❌ API Access Error. (Possible IP limit or Cloud block)."))
+                st.info(_t("💡 Hãy chuyển sang tính năng 'Tải lên Local File' trên thanh Sidebar để tiếp tục.", "💡 Please switch to 'Upload Local File' on the Sidebar to continue."))
                 return
     else:
         st.sidebar.markdown("---")
-        st.sidebar.markdown("### 📂 Upload Your Data")
-        uploaded_file = st.sidebar.file_uploader("Upload Data (.csv / .xlsx)", type=["csv", "xlsx"])
+        st.sidebar.markdown("### 📂 " + _t("Tải lên Excel/CSV", "Upload Your Data"))
+        uploaded_file = st.sidebar.file_uploader(_t("Tải Dữ liệu (.csv / .xlsx)", "Upload Data (.csv / .xlsx)"), type=["csv", "xlsx"])
         if uploaded_file is not None:
             try:
                 if uploaded_file.name.endswith('.csv'):
@@ -356,11 +359,11 @@ def main():
                 st.error(f"❌ Upload Error: {e}")
                 return
         else:
-            st.info("⬅️ Vui lòng upload File dữ liệu ở Sidebar bên trái để ứng dụng xử lý thuật toán.")
+            st.info(_t("⬅️ Vui lòng upload File dữ liệu ở Sidebar bên trái.", "⬅️ Please upload data file on the Left Sidebar."))
             return
 
     if vni_df is not None and not vni_df.empty:
-        with st.spinner('Calculating Physics Engines (WPE, MFI & Causality)...'):
+        with st.spinner(_t('Đang tính toán Bánh răng Vật lý (WPE, MFI & Causality)...', 'Calculating Physics Engines (WPE, MFI & Causality)...')):
             vni_df = calculate_advanced_entropy(vni_df, m=embed_dim, tau=1, window=rolling_window)
             vni_df = detect_market_regime(vni_df)
             
@@ -383,13 +386,13 @@ def main():
         st.markdown(f"<div class='metric-value'>{curr_data['Close']:.2f}</div>", unsafe_allow_html=True)
         
     with col2:
-        st.markdown(f"<div class='metric-label'>System Market Regime</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-label'>{'System Market Regime' if _t('V','') == 'E' else 'Trạng thái Cấu trúc'}</div>", unsafe_allow_html=True)
         regime_color = curr_data['Color'].replace('0.8', '1.0') 
         st.markdown(f"<div class='metric-value' style='color:{regime_color}'>{curr_data['Regime']}</div>", unsafe_allow_html=True)
 
     with col3:
         sys_ent_val = curr_data['System_Entropy']
-        st.markdown(f"<div class='metric-label'>Cross-Sectional Entropy</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-label'>{'Cross-Sectional Entropy' if _t('V','') == 'E' else 'Entropy Phân luồng'}</div>", unsafe_allow_html=True)
         if pd.isna(sys_ent_val):
             st.markdown(f"<div class='metric-value'>N/A</div>", unsafe_allow_html=True)
         else:
@@ -397,13 +400,13 @@ def main():
 
     with col4:
         mfi = curr_data['MFI_Price'] * 100
-        st.markdown(f"<div class='metric-label'>Market Fragility Index (MFI)</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-label'>{'Market Fragility Index (MFI)' if _t('V','') == 'E' else 'Chỉ số Phân rã (MFI)'}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='metric-value'>{mfi:.1f} / 100</div>", unsafe_allow_html=True)
 
     st.markdown("---")
 
     # --- MAIN CHART: MẢNG MÀU THỂ HIỆN REGIME ---
-    st.subheader("1. VN-Index Structural Regimes (MFI-Driven)")
+    st.subheader(_t("1. Cấu trúc Trạng thái VN-Index (MFI-Driven)", "1. VN-Index Structural Regimes (MFI-Driven)"))
     
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                         row_heights=[0.7, 0.3], vertical_spacing=0.05)
@@ -422,7 +425,7 @@ def main():
         'Stable Growth': 'rgba(0, 255, 65, 0.8)',
         'Fragile Growth': 'rgba(255, 215, 0, 0.8)',
         'Chaos/Panic': 'rgba(255, 0, 0, 0.8)',
-        'Bottoming': 'rgba(138, 43, 226, 0.8)'
+        'Structural Recomposition': 'rgba(138, 43, 226, 0.8)'
     }
     
     for regime, color in regime_colors.items():
@@ -471,35 +474,40 @@ def main():
     fig.update_yaxes(title_text="WPE (0-100)", row=2, col=1, fixedrange=False, side="right")
     st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
     
-    st.info("""
-    **Vật lý của Market Regimes (Theo MFI):**
-    - 🟩 **Stable Growth (Nền Xanh Lục)**: Giá tăng, dòng tiền có kiến trúc trật tự.
-    - 🟨 **Fragile Growth (Nền Vàng)**: Giá vẫn tăng nhưng Complexity giảm và MFI tăng vọt -> Cảnh báo rủi ro gãy đổ.
-    - 🟥 **Chaos / Panic (Nền Đỏ)**: Chu kỳ sụp đổ cấu trúc (Structural Break/White Noise behavior) - MFI cực đại.
-    - 🟪 **Bottoming (Nền Tím)**: Quá trình tái tổ chức, MFI bắt đầu mát dần (Damping).
-    """)
+    st.info(_t(
+        "**Vật lý của Trạng thái Động lượng (Theo MFI):**\n"
+        "- 🟩 **Stable Growth**: Giá tăng, dòng tiền có kiến trúc trật tự.\n"
+        "- 🟨 **Fragile Growth**: Giá tăng định danh nhưng MFI đạt đỉnh -> Kiến trúc gãy, rủi ro sụp đổ cao.\n"
+        "- 🟥 **Chaos / Panic**: Chu kỳ sụp đổ cấu trúc (White Noise).\n"
+        "- 🟪 **Structural Recomposition**: Hệ thống thoát khỏi vùng hỗn loạn và bước vào pha bình ổn cục bộ. Quá trình này đại diện cho sự sắp xếp lại các cấu phần thị trường chứ chưa hẳn là một đáy giá.",
+        "**Physics of Market Regimes (MFI-Driven):**\n"
+        "- 🟩 **Stable Growth**: Prices trace above MAs in a structurally ordered regime.\n"
+        "- 🟨 **Fragile Growth**: Prices rise nominally, but MFI balloons meaning structural breakdown -> Extreme collapse risk.\n"
+        "- 🟥 **Chaos / Panic**: Mathematical execution of the price breakdown (White Noise).\n"
+        "- 🟪 **Structural Recomposition**: The system exits the chaos zone and enters a phase of local stability. This represents a re-ordering of market components rather than a confirmed price bottom."
+    ))
 
     st.markdown("---")
 
     # --- CROSS-SECTIONAL ENTROPY & MULTI-SCALE ---
-    st.subheader("2. MSE & VN30 Components Analysis")
+    st.subheader(_t("2. Phân tích Cấu trúc (MSE & VN30)", "2. MSE & VN30 Components Analysis"))
     colA, colB = st.columns(2)
     
     with colA:
-        st.markdown("**Multi-scale WPE (Price) - Khử Nhiễu Lagging**")
+        st.markdown(_t("**Đa khung thời gian WPE - Khử Nhiễu Lagging**", "**Multi-scale WPE (Price) - Noise Reduction**"))
         fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['WPE_Price_Daily'], name='Daily WPE (Ngắn hạn)', line=dict(color='rgba(255, 255, 255, 0.4)')))
-        fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['WPE_Price_Weekly'], name='Weekly WPE (Trung hạn)', line=dict(color='rgba(0, 255, 65, 0.8)', width=2)))
-        fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['WPE_Price_Monthly'], name='Monthly WPE (Dài hạn)', line=dict(color='rgba(255, 0, 255, 0.8)', width=3)))
+        fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['WPE_Price_Daily'], name='Daily WPE', line=dict(color='rgba(255, 255, 255, 0.4)')))
+        fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['WPE_Price_Weekly'], name='Weekly WPE', line=dict(color='rgba(0, 255, 65, 0.8)', width=2)))
+        fig2.add_trace(go.Scatter(x=vni_df.index, y=vni_df['WPE_Price_Monthly'], name='Monthly WPE', line=dict(color='rgba(255, 0, 255, 0.8)', width=3)))
         fig2.update_layout(dragmode='pan', template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#000000', margin=dict(l=0, r=0, t=30, b=0), height=350)
         fig2.update_yaxes(fixedrange=False, side="right")
         st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
-        st.caption("WPE Daily nhiễu cực mạnh và WPE Weekly/Monthly thấp -> Biến động chỉ là hỗn loạn ngắn hạn, không ảnh hưởng vĩ mô.")
+        st.caption(_t("WPE Daily nhiễu mạnh nhưng Weekly/Monthly thấp -> Biến động chỉ là hỗn loạn ngắn hạn, không ảnh hưởng cấu trúc.","High short-term WPE Noise combined with stable structural WPE implies non-threatening short term fluctuations."))
 
     with colB:
-        st.markdown("**Cross-Sectional Entropy (Eigenvalue Decomposition VN30)**")
+        st.markdown(_t("**Phân luồng Cấu trúc (EVD VN30)**", "**Cross-Sectional Entropy (Eigenvalue Decomposition VN30)**"))
         if vni_df['System_Entropy'].isna().all():
-            st.info("⚠️ Không có dữ liệu rổ VN30 (Đang dùng Upload Data). Biểu đồ Correlation bị ẩn.")
+            st.info(_t("⚠️ Không có dữ liệu rổ VN30 (Đang dùng Upload Data). Biểu đồ bị ẩn.", "⚠️ VN30 data unavailable in Upload mode. Correlation chart disabled."))
         else:
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(x=vni_df.index, y=vni_df['System_Entropy'], fill='tozeroy', name='System Entropy', line=dict(color='#00BFFF')))
@@ -508,22 +516,21 @@ def main():
             fig3.update_layout(dragmode='pan', template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#000000', margin=dict(l=0, r=0, t=30, b=0), height=350)
             fig3.update_yaxes(fixedrange=False, side="right")
             st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
-            st.caption("Sự phân mảnh chuỗi cung tiền.")
+            st.caption(_t("Mức độ phân mảnh đồng thuận của dòng tiền vào 30 cổ phiếu trụ.", "Capital consensus fragmentation via Correlation eigenvalues."))
 
     st.markdown("---")
 
     # --- CECP ---
-    st.subheader("3. Complexity-Entropy Causality Plane (CECP)")
+    st.subheader(_t("3. Mặt phẳng Nhân quả Cấu trúc - Hỗn loạn (CECP)", "3. Complexity-Entropy Causality Plane (CECP)"))
     col_ce, col_mfi = st.columns([2, 1])
     with col_ce:
-        st.markdown("Phân ranh giới **López-Ruiz**: VN-Index đang dịch chuyển về ngẫu nhiên (White noise) hay có cấu trúc (Structural).")
+        st.markdown(_t("Phân ranh giới **López-Ruiz**: VN-Index đang dịch chuyển về ngẫu nhiên hay có cấu trúc (Structural).", "**López-Ruiz Boundaries**: Determining VN-Index shifts between randomness (White noise) and deterministic structures."))
         H_max, C_max, H_min, C_min = generate_ce_boundary(embed_dim)
         
         fig_ce = go.Figure()
         fig_ce.add_trace(go.Scatter(x=H_max, y=C_max, mode='lines', line=dict(color='gray', dash='dash'), name='Upper Bound', hoverinfo='none'))
         fig_ce.add_trace(go.Scatter(x=H_min, y=C_min, mode='lines', line=dict(color='gray', dash='dash'), name='Lower Bound', hoverinfo='none'))
         
-        # Plot Trajectory for last N days
         N_traj = min(120, len(vni_df.dropna(subset=['WPE_Price_Daily', 'Complexity_Price'])))
         last_n = vni_df.dropna(subset=['WPE_Price_Daily', 'Complexity_Price']).tail(N_traj)
         
@@ -540,7 +547,6 @@ def main():
             hoverinfo='text+x+y'
         ))
         
-        # Highlight present
         fig_ce.add_trace(go.Scatter(
             x=[last_n['WPE_Price_Daily'].iloc[-1]], y=[last_n['Complexity_Price'].iloc[-1]],
             mode='markers', marker=dict(color='red', size=16, symbol='star'), name='Present Market'
@@ -552,7 +558,7 @@ def main():
         st.plotly_chart(fig_ce, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
         
     with col_mfi:
-        st.markdown("**Cơ cấu Fragility Index & Chẩn đoán CECP**")
+        st.markdown(_t("**Cơ cấu Fragility Index & Chẩn đoán CECP**", "**Fragility Index & CECP Diagnostics**"))
         curr_mfi = last_n['MFI_Price'].iloc[-1]
         prev_mfi = last_n['MFI_Price'].iloc[-2]
         curr_h = last_n['WPE_Price_Daily'].iloc[-1]
@@ -564,31 +570,45 @@ def main():
         
         st.markdown("---")
         
-        # State Logic 
         if curr_h >= 0.9 and curr_c <= 0.05:
-            state_name = "🔴 Chaos/Crash (Hỗn loạn/Sụp đổ)"
-            state_prompt = "Thị trường đang ghi nhận mức Entropy biến động giá đạt cực đại ($H \\approx 1.0$) và Complexity biến mất ($C \\approx 0$). Điểm Present Market nằm ở góc dưới cùng bên phải của đồ thị CECP. Hãy mô tả trạng thái hỗn loạn này dưới góc nhìn của sự hoảng loạn bầy đàn (Herding Behavior). Nhà đầu tư nên làm gì khi hệ thống hoàn toàn mất đi tính tự tổ chức?"
+            state_name = _t("🔴 Chaos/Crash (Hỗn loạn/Sụp đổ)", "🔴 Chaos/Crash")
+            state_prompt = _t(
+                "Thị trường đang ghi nhận mức Entropy biến động giá đạt cực đại ($H \\approx 1.0$) và Complexity biến mất ($C \\approx 0$). Điểm Present Market nằm ở góc dưới cùng bên phải của đồ thị CECP. Hãy mô tả trạng thái hỗn loạn này dưới góc nhìn của sự hoảng loạn bầy đàn (Herding Behavior). Nhà đầu tư nên làm gì khi hệ thống hoàn toàn mất đi tính tự tổ chức?",
+                "The market is recording maximum price fluctuation Entropy ($H \\approx 1.0$) and vanished Complexity ($C \\approx 0$). The Present Market point resides at the bottom-right corner of the CECP plot. Describe this chaotic state from the perspective of Herding Behavior. What should investors do when the system completely loses its self-organization?"
+            )
         elif curr_h > 0.8 and curr_c < 0.1:
-            state_name = "🟡 Fragile Growth (Tăng trưởng dễ vỡ)"
-            state_prompt = "Dựa trên dữ liệu VN-Index, chỉ số MFI đang ở mức cao (>0.8) với Complexity ($C$) cực thấp và Entropy ($H$) tiệm cận vùng Chaos. Điểm trên đồ thị CECP đang bám sát đường Lower Bound. Hãy phân tích trạng thái này dưới góc độ dòng tiền nóng và rủi ro sụp đổ cấu trúc. Tại sao mức tăng điểm hiện tại lại được coi là thiếu bền vững và dễ vỡ trước các cú sốc thông tin?"
+            state_name = _t("🟡 Fragile Growth (Tăng trưởng dễ vỡ)", "🟡 Fragile Growth")
+            state_prompt = _t(
+                "Dựa trên dữ liệu VN-Index, chỉ số MFI đang ở mức cao (>0.8) với Complexity ($C$) cực thấp và Entropy ($H$) tiệm cận vùng Chaos. Điểm trên đồ thị CECP đang bám sát đường Lower Bound. Hãy phân tích trạng thái này dưới góc độ dòng tiền nóng và rủi ro sụp đổ cấu trúc. Tại sao mức tăng điểm hiện tại lại được coi là thiếu bền vững và dễ vỡ trước các cú sốc thông tin?",
+                "Based on VN-Index data, the MFI is exceptionally high (>0.8) while Complexity ($C$) is extremely low and Entropy ($H$) is approaching the Chaos zone. The point on the CECP graph is clinging to the Lower Bound. Analyze this state from the perspective of 'hot money' and structural collapse risk. Why is the current price surge considered unsustainable and fragile to information shocks?"
+            )
         elif 0.6 <= curr_h <= 0.75 and curr_h < prev_h and curr_c <= 0.15:
-            state_name = "👽 Dead Cat Bounce (Hồi phục thiếu NL)"
-            state_prompt = "VN-Index vừa trải qua nhịp giảm mạnh và đang có dấu hiệu hồi phục kỹ thuật. Chỉ số Entropy ($H$) đang giảm dần nhưng Complexity ($C$) không có sự bứt phá đáng kể, điểm vẫn nằm ở vùng biên dưới của mặt phẳng CECP. Với giả định khối lượng giao dịch (Volume) đang suy yếu như một 'quả bóng tennis mất năng lượng', hãy đưa ra nhận định về khả năng đây chỉ là một bẫy hồi phục ngắn hạn thay vì một sự khởi đầu của xu hướng Structural Growth."
+            state_name = _t("👽 Dead Cat Bounce (Hồi phục thiếu NL)", "👽 Dead Cat Bounce")
+            state_prompt = _t(
+                "VN-Index vừa trải qua nhịp giảm mạnh và đang có dấu hiệu hồi phục kỹ thuật. Chỉ số Entropy ($H$) đang giảm dần nhưng Complexity ($C$) không có sự bứt phá đáng kể, điểm vẫn nằm ở vùng biên dưới của mặt phẳng CECP. Với giả định khối lượng giao dịch (Volume) đang suy yếu như một 'quả bóng tennis mất năng lượng', hãy đưa ra nhận định về khả năng đây chỉ là một bẫy hồi phục ngắn hạn thay vì một sự khởi đầu của xu hướng Structural Growth.",
+                "VN-Index has just gone through a sharp decline and shows signs of technical recovery. Entropy ($H$) is gradually decreasing but Complexity ($C$) has no significant breakthrough, the point remains in the lower boundary region of the CECP plane. Assuming trading volume is weakening like an 'energy-depleted tennis ball', evaluate the probability of this being just a short-term recovery trap rather than the genesis of a Structural Growth trend."
+            )
         elif 0.4 <= curr_h <= 0.6 and curr_c > 0.15:
-            state_name = "🟢 Structural Growth (Bền vững)"
-            state_prompt = "Chỉ số MFI của VN-Index đang giảm về vùng an toàn (<0.5) nhờ sự gia tăng đáng kể của Statistical Complexity ($C$). Điểm trên đồ thị CECP đã rời xa Lower Bound và di chuyển về vùng trung tâm của các hệ thống phức tạp. Hãy giải thích tại sao trạng thái này cho thấy thị trường đang có sự đồng thuận về cấu trúc, dòng tiền thông minh bắt đầu dẫn dắt và các quy luật kỹ thuật có độ tin cậy cao hơn."
+            state_name = _t("🟢 Structural Growth (Bền vững)", "🟢 Structural Growth")
+            state_prompt = _t(
+                "Chỉ số MFI của VN-Index đang giảm về vùng an toàn (<0.5) nhờ sự gia tăng đáng kể của Statistical Complexity ($C$). Điểm trên đồ thị CECP đã rời xa Lower Bound và di chuyển về vùng trung tâm của các hệ thống phức tạp. Hãy giải thích tại sao trạng thái này cho thấy thị trường đang có sự đồng thuận về cấu trúc, dòng tiền thông minh bắt đầu dẫn dắt và các quy luật kỹ thuật có độ tin cậy cao hơn.",
+                "The VN-Index's MFI is returning to a safe zone (<0.5) thanks to a significant increase in Statistical Complexity ($C$). The point on the CECP graph has departed from the Lower Bound towards the center of complex systems. Explain why this indicates that the market has structural consensus, smart money is taking the lead, and technical rules boast higher reliability."
+            )
         else:
-            state_name = "⚪ Transitioning (Chuyển pha)"
-            state_prompt = "Thị trường đang nằm ở vùng đệm của mặt phẳng CECP, Entropy và Complexity đang giằng co để xác lập cấu trúc dòng tiền mới. Cần quan sát thêm quỹ đạo (Trajectory) để xác định rõ xu hướng."
+            state_name = _t("⚪ Transitioning (Chuyển pha)", "⚪ Transitioning Phase")
+            state_prompt = _t(
+                "Thị trường đang nằm ở vùng đệm của mặt phẳng CECP, Entropy và Complexity đang giằng co để xác lập cấu trúc dòng tiền mới. Cần quan sát thêm quỹ đạo (Trajectory) để xác định rõ xu hướng.",
+                "The market lies in the buffer zone of the CECP plane. Entropy and Complexity are wrestling to establish a new capital flow structure. Further observation of the Trajectory is needed to define a clear trend."
+            )
             
-        st.markdown(f"**Current CECP State:**<br> <span style='color: white; font-size: 1.1rem'>{state_name}</span>", unsafe_allow_html=True)
+        st.markdown(f"**{_t('Trạng thái CECP hiện hành:', 'Current CECP State:')}**<br> <span style='color: white; font-size: 1.1rem'>{state_name}</span>", unsafe_allow_html=True)
         st.info(f"💡 **AI Prompt Context:**\n\n_{state_prompt}_")
         
     st.markdown("---")
     
     # --- COMPARISON LAYER: ENTROPY VS TRADITIONAL LAG INDICATORS ---
-    st.subheader("4. Comparison Layer: Fragility vs Traditional (RSI & MACD)")
-    st.markdown("So sánh chỉ số Market Fragility Index với các tín hiệu truyền thống bị trễ (Lagging).")
+    st.subheader(_t("4. Chỉ báo Vật lý vs Chỉ báo Độ trễ (RSI/MACD)", "4. Comparison Layer: Fragility vs Traditional (RSI & MACD)"))
+    st.markdown(_t("Độ tương quan giữa MFI thời thời gian thực và sự phản ứng chậm chạp của RSI/MACD.", "Evaluating Market Fragility Index lead signal vs lagging signals."))
     
     fig_comp = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.33, 0.33, 0.33])
     
@@ -600,17 +620,17 @@ def main():
     fig_comp.add_trace(go.Scatter(x=vni_df.index, y=vni_df['MACD_Signal'], name='Signal', line=dict(color='magenta')), row=2, col=1)
     
     fig_comp.add_trace(go.Scatter(x=vni_df.index, y=vni_df['MFI_Price'] * 100, name='MFI Price Dynamics', line=dict(color='#00FF41')), row=3, col=1)
-    fig_comp.add_hline(y=65, row=3, col=1, line_dash="dash", line_color="red", annotation_text="Tín hiệu sớm đứt gãy")
+    fig_comp.add_hline(y=65, row=3, col=1, line_dash="dash", line_color="red", annotation_text="Tín hiệu đứt gãy" if _t("V","") == "" else "Breakdown Signal")
     
     fig_comp.update_layout(dragmode='pan', template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#000000', height=600, margin=dict(l=20, r=20, t=20, b=20))
     fig_comp.update_yaxes(title_text="RSI", row=1, col=1, fixedrange=False, side="right")
     fig_comp.update_yaxes(title_text="MACD", row=2, col=1, fixedrange=False, side="right")
-    fig_comp.update_yaxes(title_text="MFI (Scaled)", row=3, col=1, fixedrange=False, side="right")
+    fig_comp.update_yaxes(title_text="MFI", row=3, col=1, fixedrange=False, side="right")
     
     st.plotly_chart(fig_comp, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
     
     st.download_button(
-        label="Download Full Physics DataFrame (.csv)",
+        label=_t("Tải xuống DataFrame (.csv)", "Download Full Physics DataFrame (.csv)"),
         data=vni_df.to_csv().encode('utf-8'),
         file_name='vni_entropy_physics.csv',
         mime='text/csv'
