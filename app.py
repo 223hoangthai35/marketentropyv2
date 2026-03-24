@@ -317,6 +317,11 @@ def main():
                 e_date = end_date.strftime('%Y-%m-%d')
                 vni_df = fetch_market_data(ticker="VNINDEX", start_date=s_date, end_date=e_date)
                 vn30_returns = fetch_vn30_components(start_date=s_date, end_date=e_date)
+                
+                # Append VN30 returns to vni_df for Exporting capability
+                if vn30_returns is not None and not vn30_returns.empty:
+                    for c in vn30_returns.columns:
+                        vni_df[f"VN30_{c}"] = vn30_returns[c]
             except Exception as e:
                 st.error(_t("❌ Lỗi truy cập API. (Có thể do giới hạn IP/chặn Cloud).", "❌ API Access Error. (Possible IP limit or Cloud block)."))
                 st.info(_t("💡 Hãy chuyển sang tính năng 'Tải lên Local File' trên thanh Sidebar để tiếp tục.", "💡 Please switch to 'Upload Local File' on the Sidebar to continue."))
@@ -348,6 +353,12 @@ def main():
                     elif c_low == 'volume': col_mapping[c] = 'Volume'
                 
                 vni_df.rename(columns=col_mapping, inplace=True)
+                
+                # Reconstruct vn30_returns if the uploaded file contains exported VN30 columns
+                vn30_cols = [c for c in vni_df.columns if str(c).startswith("VN30_")]
+                if len(vn30_cols) > 0:
+                    vn30_returns = vni_df[vn30_cols].copy()
+                    vn30_returns.columns = [c.replace("VN30_", "") for c in vn30_cols]
                 
                 start_ts = pd.to_datetime(start_date)
                 end_ts = pd.to_datetime(end_date)
